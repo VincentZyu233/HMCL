@@ -37,21 +37,24 @@ val curseForgeApiKey = System.getenv("CURSEFORGE_API_KEY") ?: ""
 
 val launcherExe = System.getenv("HMCL_LAUNCHER_EXE") ?: ""
 
-val buildNumber = System.getenv("BUILD_NUMBER")?.toInt()
-if (buildNumber != null) {
-    version = if (JenkinsUtils.IS_ON_CI && versionType == "dev") {
-        "$versionRoot.0.$buildNumber"
-    } else {
-        "$versionRoot.$buildNumber"
-    }
+val forkVersion = System.getenv("HMCL_FORK_VERSION") ?: System.getenv("VERSION")
+if (!forkVersion.isNullOrBlank()) {
+    version = forkVersion.removePrefix("v")
 } else {
-    val shortCommit = System.getenv("GITHUB_SHA")?.lowercase()?.substring(0, 7)
-    version = if (shortCommit.isNullOrBlank()) {
-        "$versionRoot.SNAPSHOT"
-    } else if (isOfficial) {
-        "$versionRoot.dev-$shortCommit"
+    val buildNumber = System.getenv("BUILD_NUMBER")?.toInt()
+    if (buildNumber != null) {
+        version = if (JenkinsUtils.IS_ON_CI && versionType == "dev") {
+            "$versionRoot.0.$buildNumber"
+        } else {
+            "$versionRoot.$buildNumber"
+        }
     } else {
-        "$versionRoot.unofficial-$shortCommit"
+        val shortCommit = System.getenv("GITHUB_SHA")?.lowercase()?.substring(0, 7)
+        version = if (shortCommit.isNullOrBlank()) {
+            "3.17.0-vincentzyu.1"
+        } else {
+            "3.17.0-vincentzyu.1-$shortCommit"
+        }
     }
 }
 
