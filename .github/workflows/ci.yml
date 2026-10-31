@@ -197,6 +197,7 @@ jobs:
         shell: bash
         run: |
           cd artifacts
+          gh release delete "${{ needs.check.outputs.version }}" --cleanup-tag -y || true
           gh release create "${{ needs.check.outputs.version }}" \
             HMCL-* \
             --title "HMCL ${{ needs.check.outputs.version }} (vincentzyu-fork)" \

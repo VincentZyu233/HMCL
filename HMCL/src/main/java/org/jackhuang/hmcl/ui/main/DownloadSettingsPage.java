@@ -13,6 +13,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.*;
 import org.glavo.url.WebURL;
+import org.jetbrains.annotations.Nullable;
 import org.jackhuang.hmcl.setting.DownloadSource;
 import org.jackhuang.hmcl.setting.EnumCommonDirectory;
 import org.jackhuang.hmcl.setting.ProxyType;
@@ -202,25 +203,50 @@ public class DownloadSettingsPage extends StackPane {
             colHgrow.setHgrow(Priority.ALWAYS);
             configPane.getColumnConstraints().setAll(new ColumnConstraints(), colHgrow);
 
+            Label clusterIdLabel = new Label(i18n("settings.launcher.openbmclapi.cluster_id"));
+            GridPane.setRowIndex(clusterIdLabel, 0);
+            GridPane.setColumnIndex(clusterIdLabel, 0);
+
+            JFXTextField txtClusterId = new JFXTextField();
+            txtClusterId.setPromptText(i18n("settings.launcher.openbmclapi.cluster_id.prompt"));
+            FXUtils.bindString(txtClusterId, settings().customOpenBmclapiNodeClusterIdProperty());
+            GridPane.setRowIndex(txtClusterId, 0);
+            GridPane.setColumnIndex(txtClusterId, 1);
+
+            Label portLabel = new Label(i18n("settings.launcher.openbmclapi.port"));
+            GridPane.setRowIndex(portLabel, 1);
+            GridPane.setColumnIndex(portLabel, 0);
+
+            JFXTextField txtPort = new JFXTextField();
+            txtPort.setPromptText(i18n("settings.launcher.openbmclapi.port.prompt"));
+            FXUtils.bindString(txtPort, settings().customOpenBmclapiNodePortProperty());
+            GridPane.setRowIndex(txtPort, 1);
+            GridPane.setColumnIndex(txtPort, 1);
+
             Label nodeUrlLabel = new Label(i18n("settings.launcher.openbmclapi.node_url"));
-            GridPane.setRowIndex(nodeUrlLabel, 0);
+            GridPane.setRowIndex(nodeUrlLabel, 2);
             GridPane.setColumnIndex(nodeUrlLabel, 0);
 
             JFXTextField txtNodeUrl = new JFXTextField();
             txtNodeUrl.setPromptText(i18n("settings.launcher.openbmclapi.node_url.prompt"));
             FXUtils.bindString(txtNodeUrl, settings().customOpenBmclapiNodeUrlProperty());
-            GridPane.setRowIndex(txtNodeUrl, 0);
+            GridPane.setRowIndex(txtNodeUrl, 2);
             GridPane.setColumnIndex(txtNodeUrl, 1);
 
             Label secretLabel = new Label(i18n("settings.launcher.openbmclapi.cluster_secret"));
-            GridPane.setRowIndex(secretLabel, 1);
+            GridPane.setRowIndex(secretLabel, 3);
             GridPane.setColumnIndex(secretLabel, 0);
 
             JFXPasswordField txtSecret = new JFXPasswordField();
             txtSecret.setPromptText(i18n("settings.launcher.openbmclapi.cluster_secret.prompt"));
             txtSecret.textProperty().bindBidirectional(settings().customOpenBmclapiNodeSecretProperty());
-            GridPane.setRowIndex(txtSecret, 1);
+            GridPane.setRowIndex(txtSecret, 3);
             GridPane.setColumnIndex(txtSecret, 1);
+
+            JFXCheckBox chkInsecureSsl = new JFXCheckBox(i18n("settings.launcher.openbmclapi.insecure_ssl"));
+            chkInsecureSsl.selectedProperty().bindBidirectional(settings().customOpenBmclapiNodeInsecureSslProperty());
+            GridPane.setRowIndex(chkInsecureSsl, 4);
+            GridPane.setColumnSpan(chkInsecureSsl, 2);
 
             HBox actionsBox = new HBox(10);
             actionsBox.setAlignment(Pos.CENTER_LEFT);
@@ -230,7 +256,12 @@ public class DownloadSettingsPage extends StackPane {
             actionsBox.getChildren().add(btnTest);
             btnTest.setOnAction(e -> testOpenBmclapiNode(btnTest));
 
-            configPane.getChildren().addAll(nodeUrlLabel, txtNodeUrl, secretLabel, txtSecret);
+            configPane.getChildren().addAll(
+                    clusterIdLabel, txtClusterId,
+                    portLabel, txtPort,
+                    nodeUrlLabel, txtNodeUrl,
+                    secretLabel, txtSecret,
+                    chkInsecureSsl);
             configPane.disableProperty().bind(settings().customOpenBmclapiNodeEnabledProperty().not());
             actionsBox.disableProperty().bind(settings().customOpenBmclapiNodeEnabledProperty().not());
 
@@ -425,11 +456,39 @@ public class DownloadSettingsPage extends StackPane {
     @FXThread
     private boolean testingOpenBmclapi = false;
 
+    private static class ProbeResult {
+        final String name;
+        final String url;
+        final boolean success;
+        final long elapsedMs;
+        final @Nullable String message;
+
+        ProbeResult(String name, String url, boolean success, long elapsedMs, @Nullable String message) {
+            this.name = name;
+            this.url = url;
+            this.success = success;
+            this.elapsedMs = elapsedMs;
+            this.message = message;
+        }
+    }
+
     private void testOpenBmclapiNode(JFXButton testButton) {
         if (testingOpenBmclapi) return;
-        String rawUrl = settings().customOpenBmclapiNodeUrlProperty().get();
-        if (StringUtils.isBlank(rawUrl)) {
-            Controllers.dialog(i18n("settings.launcher.openbmclapi.test.empty_url"), null, MessageDialogPane.MessageType.WARNING);
+
+        String clusterId = settings().customOpenBmclapiNodeClusterIdProperty().get();
+        String port = settings().customOpenBmclapiNodePortProperty().get();
+        String fallbackUrl = settings().customOpenBmclapiNodeUrlProperty().get();
+
+        String officialUrl = "";
+        if (StringUtils.isNotBlank(clusterId)) {
+            String p = (StringUtils.isNotBlank(port) ? port.trim() : "443");
+            officialUrl = "443".equals(p)
+                    ? "https://" + clusterId.trim() + ".openbmclapi.933.moe"
+                    : "https://" + clusterId.trim() + ".openbmclapi.933.moe:" + p;
+        }
+
+        if (StringUtils.isBlank(officialUrl) && StringUtils.isBlank(fallbackUrl)) {
+            Controllers.dialog(i18n("settings.launcher.openbmclapi.test.empty_config"), null, MessageDialogPane.MessageType.WARNING);
             return;
         }
 
@@ -441,19 +500,22 @@ public class DownloadSettingsPage extends StackPane {
         spinner.setRadius(8);
         testButton.setGraphic(spinner);
 
+        final String finalOfficialUrl = officialUrl;
+        final String finalFallbackUrl = fallbackUrl;
+
         Task.supplyAsync(i18n("settings.launcher.openbmclapi.test.testing"), Schedulers.io(), () -> {
-            WebURL url = WebURL.parseBrowserInput(rawUrl);
-            HttpURLConnection connection = NetworkUtils.createHttpConnection(url);
-            try {
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-                connection.setRequestMethod("GET");
-                connection.connect();
-                return connection.getResponseCode();
-            } finally {
-                connection.disconnect();
+            ProbeResult officialResult = null;
+            if (StringUtils.isNotBlank(finalOfficialUrl)) {
+                officialResult = doProbe("官方节点", finalOfficialUrl);
             }
-        }).whenComplete(Schedulers.javafx(), (res, ex) -> {
+
+            ProbeResult fallbackResult = null;
+            if (StringUtils.isNotBlank(finalFallbackUrl)) {
+                fallbackResult = doProbe("备用/穿透节点", finalFallbackUrl);
+            }
+
+            return new ProbeResult[]{officialResult, fallbackResult};
+        }).whenComplete(Schedulers.javafx(), (results, ex) -> {
             testButton.setGraphic(null);
             testButton.setText(originalText);
             testingOpenBmclapi = false;
@@ -462,10 +524,73 @@ public class DownloadSettingsPage extends StackPane {
                 Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null
                         ? ex.getCause()
                         : ex;
-                Controllers.dialog(i18n("settings.launcher.openbmclapi.test.failed", cause.getLocalizedMessage()), null, MessageDialogPane.MessageType.ERROR);
+                Controllers.dialog(cause.getLocalizedMessage(), i18n("settings.launcher.openbmclapi.test.title"), MessageDialogPane.MessageType.ERROR);
+                return;
+            }
+
+            ProbeResult official = results[0];
+            ProbeResult fallback = results[1];
+
+            StringBuilder report = new StringBuilder();
+            boolean anySuccess = false;
+
+            if (official != null) {
+                if (official.success) {
+                    anySuccess = true;
+                    report.append("• 官方集群域名 (").append(official.url).append(")：连通正常 (").append(official.elapsedMs).append("ms)\n");
+                } else {
+                    report.append("• 官方集群域名 (").append(official.url).append(")：连接失败 (").append(official.message).append(")\n");
+                }
+            }
+
+            if (fallback != null) {
+                if (fallback.success) {
+                    anySuccess = true;
+                    report.append("• 备用穿透地址 (").append(fallback.url).append(")：连通正常 (").append(fallback.elapsedMs).append("ms)\n");
+                } else {
+                    report.append("• 备用穿透地址 (").append(fallback.url).append(")：连接失败 (").append(fallback.message).append(")\n");
+                }
+            }
+
+            if (anySuccess) {
+                String preferred;
+                if (official != null && official.success) {
+                    preferred = "首选下载线路：官方集群域名";
+                } else {
+                    preferred = "首选下载线路：备用穿透地址（已自动容灾切换）";
+                }
+                report.append("\n").append(preferred);
+                Controllers.dialog(report.toString().trim(), i18n("settings.launcher.openbmclapi.test.title"), MessageDialogPane.MessageType.INFO);
             } else {
-                Controllers.dialog(i18n("settings.launcher.openbmclapi.test.success"), null, MessageDialogPane.MessageType.INFO);
+                report.append("\n所有自建节点均不可达，下载时将自动降级为公共 BMCLAPI 源。");
+                Controllers.dialog(report.toString().trim(), i18n("settings.launcher.openbmclapi.test.title"), MessageDialogPane.MessageType.ERROR);
             }
         }).setSignificance(Task.TaskSignificance.MINOR).start();
+    }
+
+    private static ProbeResult doProbe(String name, String rawUrl) {
+        long start = System.currentTimeMillis();
+        try {
+            WebURL url = WebURL.parseBrowserInput(rawUrl);
+            HttpURLConnection conn = NetworkUtils.createHttpConnection(url);
+            try {
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(3000);
+                conn.setRequestMethod("GET");
+                conn.connect();
+                int code = conn.getResponseCode();
+                long elapsed = System.currentTimeMillis() - start;
+                return new ProbeResult(name, rawUrl, true, elapsed, "HTTP " + code);
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Throwable t) {
+            long elapsed = System.currentTimeMillis() - start;
+            String msg = t.getMessage();
+            if (msg == null || msg.isBlank()) {
+                msg = t.getClass().getSimpleName();
+            }
+            return new ProbeResult(name, rawUrl, false, elapsed, msg);
+        }
     }
 }

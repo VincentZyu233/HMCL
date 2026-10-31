@@ -589,7 +589,25 @@ public final class LauncherSettings extends ObservableSetting implements JsonSch
         return customOpenBmclapiNodeEnabled;
     }
 
-    /// The configured custom OpenBMCLAPI cluster node URL.
+    /// The configured custom OpenBMCLAPI cluster ID.
+    @SerializedName("customOpenBmclapiNodeClusterId")
+    private final StringProperty customOpenBmclapiNodeClusterId = new SimpleStringProperty();
+
+    /// Returns the custom OpenBMCLAPI cluster ID property.
+    public StringProperty customOpenBmclapiNodeClusterIdProperty() {
+        return customOpenBmclapiNodeClusterId;
+    }
+
+    /// The configured custom OpenBMCLAPI cluster official node port.
+    @SerializedName("customOpenBmclapiNodePort")
+    private final StringProperty customOpenBmclapiNodePort = new SimpleStringProperty("443");
+
+    /// Returns the custom OpenBMCLAPI cluster official node port property.
+    public StringProperty customOpenBmclapiNodePortProperty() {
+        return customOpenBmclapiNodePort;
+    }
+
+    /// The configured custom OpenBMCLAPI cluster node URL (fallback/penetration address).
     @SerializedName("customOpenBmclapiNodeUrl")
     private final StringProperty customOpenBmclapiNodeUrl = new SimpleStringProperty();
 
@@ -605,6 +623,15 @@ public final class LauncherSettings extends ObservableSetting implements JsonSch
     /// Returns the custom OpenBMCLAPI cluster node secret property.
     public StringProperty customOpenBmclapiNodeSecretProperty() {
         return customOpenBmclapiNodeSecret;
+    }
+
+    /// Whether to ignore SSL certificate and hostname mismatch for custom node.
+    @SerializedName("customOpenBmclapiNodeInsecureSsl")
+    private final BooleanProperty customOpenBmclapiNodeInsecureSsl = new SimpleBooleanProperty(true);
+
+    /// Returns the custom OpenBMCLAPI cluster node insecure SSL property.
+    public BooleanProperty customOpenBmclapiNodeInsecureSslProperty() {
+        return customOpenBmclapiNodeInsecureSsl;
     }
 
     /// The selected game directory ID.

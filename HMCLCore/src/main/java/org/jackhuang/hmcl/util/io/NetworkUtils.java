@@ -219,6 +219,7 @@ public final class NetworkUtils {
             httpConnection.setInstanceFollowRedirects(false);
             injectApiKey(url, connection);
         }
+        org.jackhuang.hmcl.download.OpenBMCLAPICustomNode.applyCustomSSLIfNeeded(connection, url);
         return connection;
     }
 
